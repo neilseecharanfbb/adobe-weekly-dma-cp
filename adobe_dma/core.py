@@ -14,7 +14,8 @@ from tqdm.auto import tqdm
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
-    from backports.zoneinfo import ZoneInfo  # python<3.9
+    from backports.zoneinfo import ZoneInfo
+
 
 # ================== Global constants ==================
 
@@ -30,42 +31,41 @@ NMA_ID = "metrics/event233"
 NTF_ID = "metrics/event263"
 DIMENSION = "variables/geodma"
 
-# ================== Brand configs ==================
-# KS only (easy to add WW later if needed)
 
-KS_SEGMENTS: Dict[str, str] = {
-    "s300006919_67dc7a83eb5ca74056703483": "Affiliate",
-    "s300006919_67dc7ab45576732634ebe466": "Cross Brand",
-    "s300006919_67dc7a962d5fdc38d3a9ad2b": "CSE",
-    "s300006919_67dc7ac7216b535a07c6b208": "Direct to Site",
-    "s300006919_67dc7ada5576732634ebe467": "Display - Retargeting",
-    "s300006919_67dc7af72d5fdc38d3a9ad2d": "Email",
-    "s300006919_67dc7b06eb5ca74056703487": "Facebook Advantage",
-    "s300006919_67dc7b17eb5ca74056703488": "Natural Search",
-    "s300006919_67dc7b42eb5ca7405670348a": "Paid Search - Brand",
-    "s300006919_67dc7b5e5576732634ebe46b": "Paid Search - Non Brand",
-    "s300006919_67dc7b6beb5ca7405670348c": "Paid Search - PLA",
-    "s300006919_67dc7b89eb5ca7405670348e": "SMS",
-    "s300006919_67dc7b9c5576732634ebe46d": "Social - Organic",
-    "s300006919_67dc7bab2d5fdc38d3a9ad34": "Social - Prospecting",
-    # IMPORTANT: this is your provided reactivation segment id:
-    "s300006919_67dc7bbc2d5fdc38d3a9ad36": "Social - Reactivation",
-    "s300006919_67dc7bcc2d5fdc38d3a9ad38": "Social - Retargeting",
-    "s300006919_67dc7bdd5576732634ebe46f": "Social - Retention",
-    "s300006919_67dc7bf4eb5ca74056703492": "Unspecified",
+# ================== CP Brand Config ==================
+
+CP_SEGMENTS: Dict[str, str] = {
+    "s300006919_67d31cd1216b535a07c6832a": "Affiliate",
+    "s300006919_67d31961863e7c14e2170487": "Cross Brand",
+    "s300006919_67d31c5eeb5ca7405670058e": "CSE",
+    "s300006919_67d31b8f5576732634ebb51a": "Direct to Site",
+    "s300006919_67dd7a8724a81279e930b0b0": "Display - Retargeting",
+    "s300006919_67d31aea2d5fdc38d3a97e01": "Email",
+    "s300006919_67d31a6d5576732634ebb507": "Facebook Advantage",
+    "s300006919_67d31be9eb5ca74056700587": "Natural Search",
+    "s300006919_67d31aa9eb5ca74056700574": "Paid Search - Brand",
+    "s300006919_67d31c99eb5ca74056700591": "Paid Search - Non Brand",
+    "s300006919_67d31b35eb5ca74056700580": "Paid Search - PLA",
+    "s300006919_67d31c30eb5ca7405670058a": "SMS",
+    "s300006919_67d31d125576732634ebb530": "Social - Organic",
+    "s300006919_67d31db82d5fdc38d3a97e25": "Social - Prospecting",
+    "s300006919_67d31d4c216b535a07c68331": "Social - Reactivation",
+    "s300006919_67d31e07216b535a07c6833a": "Social - Retargeting",
+    "s300006919_67d31d89eb5ca74056700596": "Social - Retention",
+    "s300006919_67d319b829ae424c05d29053": "Unspecified",
 }
 
 BRANDS: Dict[str, Dict[str, Any]] = {
-    "KS": {"rsid": "vrs_ospgro1_kingsize", "segments": KS_SEGMENTS},
+    "CP": {
+        "rsid": "vrs_ospgro1_eloquiicopy_0",
+        "segments": CP_SEGMENTS,
+    }
 }
+
 
 # ================== Date helpers ==================
 
 def prior_completed_week_sun_to_sun(now_et: Optional[datetime] = None) -> Tuple[date, date]:
-    """
-    Returns (start_sunday, end_sunday_exclusive) for the PRIOR completed week.
-    Fiscal week is Sunday->Saturday inclusive, end is exclusive (next Sunday).
-    """
     now = now_et or datetime.now(TZ)
     days_since_sunday = (now.weekday() + 1) % 7
     last_sunday = (now - timedelta(days=days_since_sunday)).date()
@@ -73,12 +73,13 @@ def prior_completed_week_sun_to_sun(now_et: Optional[datetime] = None) -> Tuple[
     end_sun_excl = last_sunday
     return start_sun, end_sun_excl
 
+
 def stable_week_filename(brand_keys: List[str], start_sun: str, end_sat: str) -> str:
     brands_part = "_".join(brand_keys)
     return f"adobe_dma_by_segment_{brands_part}_{start_sun}_to_{end_sat}.xlsx"
 
+
 def daterange_days(start_day: date, end_day_excl: date) -> List[date]:
-    """Return list of dates: start_day .. end_day_excl-1"""
     out = []
     cur = start_day
     while cur < end_day_excl:
@@ -86,24 +87,23 @@ def daterange_days(start_day: date, end_day_excl: date) -> List[date]:
         cur += timedelta(days=1)
     return out
 
-def day_iso_range(d: date) -> Tuple[str, str]:
-    """Single day range: d 00:00 to d+1 00:00 (exclusive)."""
-    start_iso = f"{d}T00:00:00.000"
-    end_iso = f"{(d + timedelta(days=1))}T00:00:00.000"
-    return start_iso, end_iso
 
-# ================== Token manager ==================
+def day_iso_range(d: date) -> Tuple[str, str]:
+    return f"{d}T00:00:00.000", f"{(d + timedelta(days=1))}T00:00:00.000"
+
+
+# ================== Token Manager ==================
 
 class TokenManager:
     def __init__(self, client_id: str, client_secret: str, auth_url: str):
         self.client_id = client_id
         self.client_secret = client_secret
         self.auth_url = auth_url
-        self._token: Optional[str] = None
-        self._expires_at: float = 0.0
+        self._token = None
+        self._expires_at = 0
         self._lock = threading.Lock()
 
-    def _request_new_token(self) -> Tuple[str, float]:
+    def _request_new_token(self):
         data = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,
@@ -118,19 +118,20 @@ class TokenManager:
         expires_at = time.time() + int(payload.get("expires_in", 3600))
         return token, expires_at
 
-    def get_token(self) -> str:
+    def get_token(self):
         with self._lock:
             if self._token and time.time() < self._expires_at - 30:
                 return self._token
             self._token, self._expires_at = self._request_new_token()
             return self._token
 
-    def force_refresh(self) -> str:
+    def force_refresh(self):
         with self._lock:
             self._token, self._expires_at = self._request_new_token()
             return self._token
 
-# ================== Adobe AA client ==================
+
+# ================== Adobe AA Client ==================
 
 class AdobeAAClient:
     def __init__(
@@ -167,7 +168,7 @@ class AdobeAAClient:
 
         self.token_mgr = TokenManager(client_id, client_secret, self.auth_url)
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self):
         token = self.token_mgr.get_token()
         return {
             "Authorization": f"Bearer {token}",
@@ -178,19 +179,10 @@ class AdobeAAClient:
             "Content-Type": "application/json"
         }
 
-    def _sleep_backoff(self, attempt: int, base: float = 0.75, cap: float = 20.0):
-        delay = min(cap, base * (2 ** attempt) + 0.05 * attempt)
-        time.sleep(delay)
+    def _sleep_backoff(self, attempt: int):
+        time.sleep(min(20, 0.75 * (2 ** attempt)))
 
-    def _build_payload(
-        self,
-        rsid: str,
-        segment_id: str,
-        start_iso: str,
-        end_iso: str,
-        page: int,
-        limit: int
-    ) -> Dict[str, Any]:
+    def _build_payload(self, rsid, segment_id, start_iso, end_iso, page):
         return {
             "rsid": rsid,
             "globalFilters": [
@@ -208,20 +200,18 @@ class AdobeAAClient:
             },
             "dimension": DIMENSION,
             "settings": {
-                "countRepeatInstances": True,
-                "includeAnnotations": True,
-                "limit": limit,
+                "limit": self.page_size,
                 "page": page,
                 "nonesBehavior": "return-nones"
             }
         }
 
-    def _parse_rows(self, rows: List[Dict[str, Any]], date_label: str, channel_name: str) -> pd.DataFrame:
+    def _parse_rows(self, rows, date_label, channel_name):
         out = []
         for r in rows or []:
             vals = r.get("data", [])
             out.append({
-                "Date": date_label,  # single day YYYY-MM-DD
+                "Date": date_label,
                 "DMA": r.get("value"),
                 "Last_Touch_Channel": channel_name,
                 "Visits": vals[0] if len(vals) > 0 else None,
@@ -232,225 +222,56 @@ class AdobeAAClient:
             })
         return pd.DataFrame(out, columns=OUTPUT_COLUMNS)
 
-    def _fetch_page(
-        self,
-        session: requests.Session,
-        cache_root: Path,
-        rsid: str,
-        segment_id: str,
-        start_iso: str,
-        end_iso: str,
-        page: int
-    ) -> Dict[str, Any]:
-        seg_dir = cache_root / rsid / segment_id
-        seg_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = seg_dir / f"page_{page:05d}.json"
-
-        if cache_file.exists():
-            with cache_file.open("r", encoding="utf-8") as f:
-                return json.load(f)
-
-        payload = self._build_payload(rsid, segment_id, start_iso, end_iso, page, self.page_size)
-        max_attempts = 6
-        attempt = 0
-
-        while attempt < max_attempts:
-            try:
-                resp = session.post(self.report_url, headers=self._headers(), json=payload, timeout=120)
-                status = resp.status_code
-
-                if status == 200:
-                    data = resp.json()
-                    with cache_file.open("w", encoding="utf-8") as f:
-                        json.dump(data, f)
-                    return data
-
-                if status == 401:
-                    self.token_mgr.force_refresh()
-                    attempt += 1
-                    self._sleep_backoff(attempt)
-                    continue
-
-                if status in (429, 500, 502, 503, 504):
-                    ra = resp.headers.get("Retry-After")
-                    attempt += 1
-                    if ra:
-                        try:
-                            time.sleep(float(ra))
-                        except Exception:
-                            self._sleep_backoff(attempt)
-                    else:
-                        self._sleep_backoff(attempt)
-                    continue
-
-                raise RuntimeError(f"HTTP {status} rsid={rsid} seg={segment_id} page={page}: {resp.text}")
-
-            except requests.Timeout:
-                attempt += 1
-                self._sleep_backoff(attempt)
-            except requests.RequestException:
-                attempt += 1
-                self._sleep_backoff(attempt)
-
-        raise RuntimeError(f"Failed rsid={rsid} seg={segment_id} page={page} after {max_attempts} attempts")
-
-    def _fetch_segment_all_pages_for_day(
-        self,
-        day_cache_root: Path,
-        rsid: str,
-        segment_id: str,
-        channel_name: str,
-        start_iso: str,
-        end_iso: str,
-        date_label: str,
-    ) -> pd.DataFrame:
-        frames: List[pd.DataFrame] = []
-        seg_dir = day_cache_root / rsid / segment_id
-        seg_dir.mkdir(parents=True, exist_ok=True)
-
-        with requests.Session() as session:
-            first = self._fetch_page(session, day_cache_root, rsid, segment_id, start_iso, end_iso, 0)
-            total_pages = int(first.get("totalPages", 1))
-            frames.append(self._parse_rows(first.get("rows", []), date_label, channel_name))
-
-            cached_pages = {
-                int(p.stem.split("_")[-1]) for p in seg_dir.glob("page_*.json")
-                if p.stem.split("_")[-1].isdigit()
-            }
-            needed = [p for p in range(1, total_pages) if p not in cached_pages]
-
-            if needed:
-                with ThreadPoolExecutor(max_workers=self.workers_pages) as pool:
-                    futs = {
-                        pool.submit(
-                            self._fetch_page,
-                            session,
-                            day_cache_root,
-                            rsid,
-                            segment_id,
-                            start_iso,
-                            end_iso,
-                            p
-                        ): p
-                        for p in needed
-                    }
-                    for fut in as_completed(futs):
-                        data = fut.result()
-                        frames.append(self._parse_rows(data.get("rows", []), date_label, channel_name))
-
-        if frames:
-            return pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
-        return pd.DataFrame(columns=OUTPUT_COLUMNS)
-
-    def run_week_to_excel(
-        self,
-        brand_keys: List[str],
-        start_sun: date,
-        end_sun_excl: date,
-        filename: Optional[str] = None,
-        show_progress: bool = True,
-    ) -> Path:
-        for bkey in brand_keys:
-            if bkey not in BRANDS:
-                raise ValueError(f"Unknown brand '{bkey}'. Valid: {sorted(BRANDS.keys())}")
-
-        # Weekly filename uses Sun->Sat (nice and matches fiscal week display)
+    def run_week_to_excel(self, brand_keys, start_sun, end_sun_excl):
+        days = daterange_days(start_sun, end_sun_excl)
         end_sat = end_sun_excl - timedelta(days=1)
-        label_start = str(start_sun)
-        label_end_sat = str(end_sat)
-
-        if not filename:
-            filename = stable_week_filename(brand_keys, label_start, label_end_sat)
-
+        filename = stable_week_filename(brand_keys, str(start_sun), str(end_sat))
         out_path = self.output_dir / filename
 
-        # Pull each day in the fiscal week
-        days = daterange_days(start_sun, end_sun_excl)
-
-        problems: List[str] = []
-        had_any_sheet = False
-
-        with pd.ExcelWriter(out_path, engine="openpyxl", mode="w") as writer:
+        with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
             for bkey in brand_keys:
                 rsid = BRANDS[bkey]["rsid"]
-                segments: Dict[str, str] = BRANDS[bkey]["segments"]
-                seg_items = list(segments.items())
+                segments = BRANDS[bkey]["segments"]
+                frames = []
 
-                frames_for_brand: List[pd.DataFrame] = []
-
-                day_iter = days
-                if show_progress:
-                    day_iter = tqdm(days, desc=f"Days ({bkey})", leave=True)
-
-                for d in day_iter:
+                for d in tqdm(days, desc=f"Days ({bkey})"):
                     start_iso, end_iso = day_iso_range(d)
-                    date_label = str(d)  # <- daily Date value
+                    date_label = str(d)
 
-                    # day-scoped cache -> resumable per day
-                    day_cache_root = self.cache_root / f"{d}"
-                    day_cache_root.mkdir(parents=True, exist_ok=True)
+                    for seg_id, channel_name in segments.items():
+                        page = 0
+                        while True:
+                            payload = self._build_payload(rsid, seg_id, start_iso, end_iso, page)
+                            resp = requests.post(self.report_url, headers=self._headers(), json=payload)
 
-                    with ThreadPoolExecutor(max_workers=self.workers_segments) as pool:
-                        futs = {
-                            pool.submit(
-                                self._fetch_segment_all_pages_for_day,
-                                day_cache_root,
-                                rsid,
-                                seg_id,
-                                ch_name,
-                                start_iso,
-                                end_iso,
-                                date_label,
-                            ): seg_id
-                            for seg_id, ch_name in seg_items
-                        }
+                            if not resp.ok:
+                                raise RuntimeError(resp.text)
 
-                        pbar = tqdm(total=len(futs), desc=f"Segments ({bkey} {d})", leave=False) if show_progress else None
+                            data = resp.json()
+                            rows = data.get("rows", [])
+                            if not rows:
+                                break
 
-                        for fut in as_completed(futs):
-                            seg_id = futs[fut]
-                            try:
-                                df = fut.result()
-                                if not df.empty:
-                                    frames_for_brand.append(df)
-                            except Exception as e:
-                                problems.append(f"{bkey}/{rsid} | {d} | {seg_id}: {e}")
-                            finally:
-                                if pbar:
-                                    pbar.update(1)
+                            df = self._parse_rows(rows, date_label, channel_name)
+                            frames.append(df)
 
-                        if pbar:
-                            pbar.close()
+                            if page + 1 >= data.get("totalPages", 1):
+                                break
+                            page += 1
 
-                if frames_for_brand:
-                    df_brand = pd.concat(frames_for_brand, ignore_index=True)[OUTPUT_COLUMNS]
-
-                    # ---- SORTING (requested) ----
-                    # Date asc, Channel asc, Visits desc, DMA asc
+                if frames:
+                    df_brand = pd.concat(frames, ignore_index=True)
                     df_brand = df_brand.sort_values(
                         by=["Date", "Last_Touch_Channel", "Visits", "DMA"],
                         ascending=[True, True, False, True],
                         kind="mergesort",
                         na_position="last",
                     )
-
                     sheet_name = f"{bkey}_{rsid}"[:31]
                     df_brand.to_excel(writer, sheet_name=sheet_name, index=False)
-                    had_any_sheet = True
-                else:
-                    problems.append(f"{bkey}/{rsid}: no data collected for any day/segment.")
-
-            if not had_any_sheet:
-                pd.DataFrame(columns=OUTPUT_COLUMNS).to_excel(writer, sheet_name="Summary", index=False)
-                if problems:
-                    pd.DataFrame({"Issues": problems}).to_excel(writer, sheet_name="Errors", index=False)
-
-        if problems:
-            print("⚠️ Issues encountered:")
-            for p in problems:
-                print(" -", p)
 
         return out_path
+
 
 # ================== FTP upload ==================
 
