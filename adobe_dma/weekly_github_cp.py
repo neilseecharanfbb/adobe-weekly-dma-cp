@@ -1,8 +1,7 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-
-from adobe_dma.core import (
+from adobe_dma.core_cp import (
     AdobeAAClient,
     prior_completed_week_sun_to_sun,
     upload_to_ftp,
@@ -17,8 +16,7 @@ def main():
     AA_COMPANY_ID = os.environ["AA_COMPANY_ID"]
 
     # ---------------- Brand selection ----------------
-    # Example: "KS" or "KS,WW"
-    brand_keys = [b.strip().upper() for b in os.environ.get("BRAND_KEYS", "KS").split(",") if b.strip()]
+    brand_keys = [b.strip().upper() for b in os.environ.get("BRAND_KEYS", "CP").split(",") if b.strip()]
 
     # ---------------- Performance knobs (safe defaults for GitHub) ----------------
     page_size = int(os.environ.get("PAGE_SIZE", "2000"))
@@ -46,11 +44,8 @@ def main():
     )
 
     # ---------------- Date range ----------------
-    # Returns (start_sunday, end_sunday_exclusive) for the PRIOR completed week.
-    # This is exactly your fiscal week Sunday->Saturday, because the end is exclusive.
     ws, we = prior_completed_week_sun_to_sun()
     fiscal_end_sat = we - timedelta(days=1)
-
     print(f"🗓️ Running fiscal week (Sun-Sat): {ws} to {fiscal_end_sat}")
     print(f"   (Adobe API dateRange end-exclusive): {ws}T00:00:00.000/{we}T00:00:00.000")
 
@@ -59,10 +54,9 @@ def main():
         brand_keys=brand_keys,
         start_sun=ws,
         end_sun_excl=we,
-        filename=None,          # stable naming from core.py
+        filename=None,
         show_progress=True,
     )
-
     print(f"✅ Created: {out_path}")
 
     # ---------------- FTP upload ----------------
