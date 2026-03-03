@@ -497,3 +497,4 @@ def upload_to_ftp(local_path: Path, remote_dir: str, host: str, user: str, pwd: 
             time.sleep(min(10, 2 * attempt))
 
     raise RuntimeError(f"FTP upload failed after {retries} attempts: {last_err}")
+
