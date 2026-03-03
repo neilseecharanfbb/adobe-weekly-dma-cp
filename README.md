@@ -1,1 +1,1 @@
-# adobe-weekly-dma-ks
+# adobe-weekly-dma-cp
